@@ -1,4 +1,7 @@
-use bevy::{prelude::*, utils::hashbrown::HashMap};
+use bevy::{prelude::*, utils::hashbrown::HashMap, render::render_resource::encase::vector::FromVectorParts};
+
+pub const BOARD_HEIGHT: u8 = 7;
+pub const BOARD_WIDTH: u8 = 9;
 
 /// Players will be associated with a team.
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
@@ -19,14 +22,14 @@ pub struct BoardPositionComponent(BoardPosition);
 
 #[derive(Resource)]
 pub struct Board {
-    board: HashMap<BoardPosition, Option<Team>>,
+    pub board: HashMap<BoardPosition, Option<Team>>,
 }
 
 impl Board {
     pub fn new() -> Self {
         let mut board = HashMap::new();
-        for x in 1..8 {
-            for y in 1..7 {
+        for x in 1..BOARD_WIDTH {
+            for y in 1..BOARD_HEIGHT {
                 board.insert(BoardPosition(x, y), None);
             }
         }
@@ -39,10 +42,7 @@ pub struct ConnectFourBoardPlugin;
 
 impl Plugin for ConnectFourBoardPlugin {
     fn build(&self, app: &mut App) {
-        // app.insert_resource(Board::new())
-        //     .add_systems(
-        //         Update, 
-        //         on_event());
+        app.insert_resource(Board::new());
     }
 }
 
@@ -57,11 +57,9 @@ impl Board {
             .iter()
             .min_by_key(|pair: &(&BoardPosition, &Option<Team>)| {
                 println!("Checking {:?}", pair);
-// Find the BoardPosition which has the highest y / .1 value,
+                // Find the BoardPosition which has the highest y / .1 value,
                 //  whose Option<TeampComponent> is None (the position is unoccupied)
                 if pair.0.0 == column && pair.1.is_none() {
-                    println!("Found empty space at {:?}", pair);
-                    println!("Y coord is {:?}", pair.0.1);
                     Some(pair.0.1)
                 } else {
                     None
@@ -69,12 +67,12 @@ impl Board {
             }) {
 
             // Push this team's piece to the empty space we identified
-            println!("Pushed piece to column {}, now occupying space {:?}", column, empty_space);
+            debug!("Pushed piece to column {}, now occupying space {:?}", column, empty_space);
             self.board.insert(*empty_space, Some(piece));
             Ok(())
         } else {
             // Error just logs a message for now, in theory this should be illegal
-            println!("Could not push piece to column {}, column was full or does not exist", column);
+            debug!("Could not push piece to column {}, column was full or does not exist", column);
             // error!("Could not push piece to column {}, column was full or does not exist", column);
             Err(())
         }
