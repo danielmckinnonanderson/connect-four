@@ -1,19 +1,22 @@
-use bevy::{prelude::*, log::LogPlugin, window::WindowResolution};
+use bevy::{prelude::*, log::LogPlugin};
 use board::ConnectFourBoardPlugin;
+use game::GameState;
 use ui::ConnectFourUIPlugin;
 
 mod board;
-// mod game;
+mod game;
 mod ui;
 
 
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash)]
 pub enum AppState {
-    MainMenu,
     Loading,
-    TakingTurn,
-    EvaluatingEndConditions,
-    EndConditionMet,
+    MainMenu,
+    RunningGame(GameState),
+    Paused(GameState),
+    GameOver,
+    PostGameMenu,
+    Exiting,
 }
 
 fn main() {
@@ -33,5 +36,4 @@ fn main() {
 
         .run();
 }
-
 

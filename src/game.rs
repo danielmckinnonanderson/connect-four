@@ -12,7 +12,7 @@ pub enum EndState {
 pub enum GameState {
     #[default]
     Initializing,
-    TakingTurn(Entity),
+    TakingTurn,
     EvaluatingEndConditions(BoardPosition),
     EndConditionMet(EndState),
     Paused,
