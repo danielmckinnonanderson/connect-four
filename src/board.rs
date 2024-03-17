@@ -14,6 +14,7 @@ pub enum Team {
 
 #[derive(Event, Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct InsertPieceEvent {
+    pub team: Team,
     pub column: u8,
 }
 
@@ -98,29 +99,39 @@ pub fn insert_piece_system(
     mut commands: Commands,
     mut board: ResMut<Board>,
     mut insert_piece_event: EventReader<InsertPieceEvent>,
-    _state: Res<State<AppState>>,
-    _query: Query<(&TeamComponent, &TakingTurnMarker)>,
+    // _query: Query<(&TeamComponent, &TakingTurnMarker)>,
 ) {
+    debug!("Running insert_piece_system");
     let mut ctr = 0;
 
     for event in insert_piece_event.read() {
         debug!("Received InsertPieceEvent for column {}", event.column);
         if let Ok(()) = push_piece_to_column(&mut board, Team::A, event.column) {
             debug!("Inserted piece into column {}", event.column);
-            commands.spawn(TeamComponent(Team::A));
         } else {
             error!("Could not insert piece into column {}", event.column);
         }
         ctr += 1;
     }
 
-    debug_assert!(ctr <= 1,
-        "insert_piece_system ran more than once in a single frame, processed {} InsertPieceEvents", ctr);
+    if ctr > 1 {
+        error!("insert_piece_system ran more than once in a single frame, processed {} InsertPieceEvents", ctr);
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    fn testutil_create_input_event_system(
+        mut event_writer: EventWriter<InsertPieceEvent> 
+    ) {
+        println!("Writing test event");
+        event_writer.send(InsertPieceEvent {
+            team: Team::A,
+            column: 1,
+        });
+    }
 
     #[test]
     fn test_new() {
@@ -155,6 +166,41 @@ mod test {
 
         let result = push_piece_to_column(&mut b, Team::B, 1);
         assert_eq!(result, Err(()));
+    }
+
+    // Based on example code from https://github.com/bevyengine/bevy/blob/main/tests/how_to_test_systems.rs
+    #[test]
+    fn test_insert_piece_system() {
+        let mut app = App::new();
+
+        // Pre-requisites
+        app.insert_resource(Board::new());
+        app.insert_state(AppState::RunningGame(GameState::TakingTurn));
+        app.add_event::<InsertPieceEvent>();
+        // Guarantee that we create an input event before checking run 
+        // conditions for insert_piece system
+        app.add_systems(Update, (
+                testutil_create_input_event_system,
+                insert_piece_system,
+            ).chain());
+
+        let _player_id = app.world.spawn((
+            TeamComponent(Team::A),
+            TakingTurnMarker {})
+        ).id();
+
+        // Tick to trigger systems that run on Update schedule
+        app.update();
+
+        // Get EventReader
+        let insert_piece_event = app.world.resource::<Events<InsertPieceEvent>>();
+        let mut insert_piece_reader = insert_piece_event.get_reader();
+
+        let insert_piece = insert_piece_reader.read(insert_piece_event).next().unwrap();
+
+        assert_eq!(insert_piece.column, 1);
+        let board = app.world.resource::<Board>();
+        assert_eq!(board.board.get(&BoardPosition(1, 1)), Some(&Some(Team::A)));
     }
 }
 

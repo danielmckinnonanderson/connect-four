@@ -1,6 +1,6 @@
-use bevy::{prelude::*, log::LogPlugin};
+use bevy::{prelude::*, log::LogPlugin, render::camera::ScalingMode};
 use board::ConnectFourBoardPlugin;
-use game::GameState;
+use game::{GameState, TurnBasedGameplayPlugin};
 use ui::ConnectFourUIPlugin;
 
 mod board;
@@ -8,9 +8,10 @@ mod game;
 mod ui;
 
 
-#[derive(States, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(States, Default, Debug, Clone, Eq, PartialEq, Hash)]
 pub enum AppState {
-    Loading,
+    #[default]
+    InitialLoading,
     MainMenu,
     RunningGame(GameState),
     Paused(GameState),
@@ -21,7 +22,7 @@ pub enum AppState {
 
 fn main() {
     App::new()
-        .insert_state(AppState::Loading)
+        .insert_state(AppState::InitialLoading)
 
         .add_plugins(
             DefaultPlugins
@@ -31,9 +32,25 @@ fn main() {
                 update_subscriber: None,
             })
         )
+        .add_plugins(TurnBasedGameplayPlugin)
         .add_plugins(ConnectFourBoardPlugin)
         .add_plugins(ConnectFourUIPlugin)
 
         .run();
+}
+
+fn setup(
+    mut commands: Commands,
+) {
+    commands.spawn(
+        Camera2dBundle {
+            projection: OrthographicProjection {
+                scaling_mode: ScalingMode::FixedVertical(1.0),
+                ..default()
+            }.into(),
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            ..default()
+        }
+    );
 }
 
