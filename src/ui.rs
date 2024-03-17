@@ -1,6 +1,13 @@
-use bevy::{prelude::*, window::PrimaryWindow, winit::WinitSettings};
+use bevy::{prelude::*, window::PrimaryWindow, winit::WinitSettings, render::color};
 
 use crate::board::Board;
+
+// Menu code taken from Bevy example github.com/bevyengine/bevy/blob/main/examples/games/game_menu.rs
+const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
+const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
+const HOVERED_PRESSED_BUTTON: Color = Color::rgb(0.25, 0.65, 0.25);
+const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
+
 
 // Listen for all of the relevant events in our game and draw
 // their representations to the screen
@@ -9,31 +16,41 @@ pub struct ConnectFourUIPlugin;
 #[derive(Component)]
 pub struct MainCameraMarker;
 
+#[derive(Component)]
+pub enum MainMenuOption {
+    BeginNewGame,
+    Quit,
+}
+
+#[derive(Component)]
+pub enum MenuButtonAction {
+
+}
+
+#[derive(Component)]
+struct SelectedOption;
+
 #[derive(Resource, Default)]
 struct WorldCoords(Vec2);
 
-impl Plugin for ConnectFourUIPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_ui)
-            // Mouse coords in world space
-            .init_resource::<WorldCoords>()
 
-            // Only run app when there is user input
-            .insert_resource(WinitSettings::desktop_app())
-            .add_systems(
-                Update,
-                draw_board
-                    .run_if(resource_exists_and_changed::<Board>
-                        .and_then(resource_exists::<AssetHandles>)
-                    )
-            )
-            .add_systems(
-                Update,
-                track_cursor_in_worldspace_system
-                .run_if(resource_exists_and_changed::<WorldCoords>)
-            );
+/// Update the appearance of the button based on mouse interaction
+fn main_menu_button_hover_system(
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor, Option<&SelectedOption>),
+        (Changed<Interaction>, With<Button>),
+    >,
+) {
+    for (interaction, mut color, selected) in &mut interaction_query {
+        *color = match (*interaction, selected) {
+            (Interaction::Pressed, _) | (Interaction::None, Some(_)) => PRESSED_BUTTON.into(),
+            (Interaction::Hovered, Some(_)) => HOVERED_PRESSED_BUTTON.into(),
+            (Interaction::Hovered, None) => HOVERED_BUTTON.into(),
+            (Interaction::None, None) => NORMAL_BUTTON.into(),
+        }
     }
 }
+
 
 #[derive(Resource, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct AssetHandles {
@@ -46,7 +63,7 @@ pub struct AssetHandles {
     pub pointer_blue: Handle<Image>,
 }
 
-fn setup_ui(
+pub fn setup_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
@@ -64,6 +81,86 @@ fn setup_ui(
     commands.insert_resource(asset_handles.clone());
     commands.spawn(Camera2dBundle::default());
     debug!("UI setup complete");
+}
+
+#[derive(Component)]
+pub struct MainMenuUIElement;
+
+pub fn draw_main_menu(
+    mut commands: Commands,
+    _asset_handles: Res<AssetHandles>,
+) {
+    let button_style = Style {
+        width: Val::Px(320.0),
+        height: Val::Px(64.0),
+        margin: UiRect::all(Val::Px(16.0)),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        ..default()
+    };
+
+    let button_text_style = TextStyle {
+        font_size: 32.0,
+        color: Color::WHITE,
+        ..default()
+    };
+
+    commands.spawn((NodeBundle {
+            style: Style {
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                border: UiRect::all(Val::Px(2.0)),
+                ..default()
+            },
+            background_color: BackgroundColor(Color::BLACK),
+            ..default()
+        },
+        MainMenuUIElement)
+    )
+    .with_children(|main_menu_root| {
+            main_menu_root.spawn(
+                NodeBundle {
+                    style: Style {
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    background_color: Color::DARK_GRAY.into(),
+                    ..default()
+                })
+                .with_children(|main_menu_root| {
+                    main_menu_root.spawn(TextBundle::from_section(
+                        "Connect Four",
+                        TextStyle {
+                            font_size: 80.0,
+                            color: Color::WHITE,
+                            ..default()
+                        },
+                    ).with_style(Style {
+                            margin: UiRect::all(Val::Px(64.0)),
+                            ..default()
+                        })
+                    );
+                });
+
+            // Main menu buttons
+            main_menu_root.spawn((
+                // Begin new game button
+                ButtonBundle {
+                    style: button_style.clone(),
+                    ..default()
+                },
+                MainMenuOption::BeginNewGame,
+            ))
+            .with_children(|parent| {
+                parent.spawn(TextBundle::from_section(
+                    "New Game",
+                    button_text_style.clone()
+                ));
+            });
+        });
 }
 
 fn draw_board(
