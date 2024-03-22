@@ -1,86 +1,95 @@
 use bevy::{prelude::*};
 
-use crate::{board::{BoardPosition, Team, Board}, AppState};
+use crate::{board::{BoardPosition, Team, Board}, AppState, TEXT_COLOR};
 
-#[derive(States, Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum EndState {
-    Won((Entity, [BoardPosition; 4])),
-    Draw
+// Tag component used to tag entities added on the game screen
+#[derive(Component)]
+struct OnGameScreen;
+
+#[derive(Resource, Deref, DerefMut)]
+struct GameTimer(Timer);
+
+fn game_setup(
+    mut commands: Commands,
+) {
+    commands
+        .spawn((
+            NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    // center children
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    ..default()
+                },
+                ..default()
+            },
+            OnGameScreen,
+        ))
+        .with_children(|parent| {
+            // First create a `NodeBundle` for centering what we want to display
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        // This will display its children in a column, from top to bottom
+                        flex_direction: FlexDirection::Column,
+                        // `align_items` will align children on the cross axis. Here the main axis is
+                        // vertical (column), so the cross axis is horizontal. This will center the
+                        // children
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    background_color: Color::BLACK.into(),
+                    ..default()
+                })
+                .with_children(|parent| {
+                    // Display two lines of text, the second one with the current settings
+                    parent.spawn(
+                        TextBundle::from_section(
+                            "Will be back to the menu shortly...",
+                            TextStyle {
+                                font_size: 80.0,
+                                color: TEXT_COLOR,
+                                ..default()
+                            },
+                        )
+                        .with_style(Style {
+                            margin: UiRect::all(Val::Px(50.0)),
+                            ..default()
+                        }),
+                    );
+                });
+        });
+    // Spawn a 5 seconds timer to trigger going back to the menu
+    commands.insert_resource(GameTimer(Timer::from_seconds(5.0, TimerMode::Once)));
 }
 
-#[derive(States, Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
-pub enum GameState {
-    #[default]
-    Initializing,
-    TakingTurn,
-    EvaluatingEndConditions,
-    EndConditionMet(EndState),
-    Paused,
+// Tick the timer, and change state when finished
+fn game(
+    time: Res<Time>,
+    mut game_state: ResMut<NextState<AppState>>,
+    mut timer: ResMut<GameTimer>,
+) {
+    if timer.tick(time.delta()).finished() {
+        game_state.set(AppState::Menu);
+    }
 }
 
-/// Occurs right after changing NextState to TakingTurn.
-#[derive(Event)]
-pub struct NextTurnBeginEvent;
-
-/// Other modules can listen for TurnEndEvent in order to
-/// check end conditions before advancing to the next turn.
-#[derive(Event)]
-pub struct TurnEndedEvent(Entity);
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TurnNumber(u16);
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TakingTurnMarker;
 
-/// Defines the ability to be represented in the turn order.
-/// Contains a value .0 of type `usize`, which is the value
-/// of this Entity in the turn order
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TurnTaker(usize);
+pub struct PlayerMarker;
 
-pub struct TurnBasedGameplayPlugin;
-
-impl Plugin for TurnBasedGameplayPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_event::<NextTurnBeginEvent>()
-            .add_event::<TurnEndedEvent>()
-            .insert_state(GameState::default())
-            .add_systems(
-                OnEnter(AppState::RunningGame(GameState::EvaluatingEndConditions)),
-                evaluate_end_condition_system
-            )
-            // .add_systems(
-            //     Update,
-            //     evaluate_end_condition_system
-            //         .run_if(in_state(AppState::RunningGame(GameState::EvaluatingEndConditions))),
-            // )
-            // .add_systems(
-            //     Update,
-            //     end_turn_system
-            //         .run_if(in_state(AppState::RunningGame(GameState::TakingTurn))),
-            // )
-        ;
-    }
-}
-
-pub enum WinCondition {
-    Won(Team),
-    Draw,
-}
-
-/// Remove TakingTurnMarker and emit a "TurnEnded" event for the Entity
-/// currently marked by TakingTurnMarker.
-pub fn end_turn_system(
-    mut commands: Commands,
-    mut turn_ended_e: EventWriter<TurnEndedEvent>,
-    query: Query<(Entity, &TakingTurnMarker)>,
-    mut next_state: NextState<GameState>,
-) {
-    let (just_ended, marker) = query.single();
-    debug!("Removing TakingTurnMarker {:?} from {:?}", marker, just_ended);
-
-    commands.entity(just_ended).remove::<TakingTurnMarker>();
-    turn_ended_e.send(TurnEndedEvent(just_ended));
-}
-
+/// Component added to an entity when they have won the game.
+/// Contains an array of four board positions, which is their
+///  winning combination.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct WinnerMarker(pub [BoardPosition; 4]);
 
 /// Evaluate the board to check game-end conditions.
 ///
@@ -91,16 +100,65 @@ pub fn end_turn_system(
 /// Otherwise, set `NextState` to TakingTurn.
 pub fn evaluate_end_condition_system(
     mut commands: Commands,
+    turn_number: ResMut<TurnNumber>,
     board: Res<Board>,
-    mut next_state: ResMut<NextState<GameState>>,
+    mut next_state: ResMut<NextState<AppState>>,
+    just_took_turn_query: Query<Entity, (With<TakingTurnMarker>, With<PlayerMarker>)>,
 ) {
+    if turn_number.0 < 4 {
+        debug!("Turn number is less than 4, skipping end condition check");
+        next_state.set(AppState::WaitForSelection);
+        return;
+    }
+
     // TODO - Actually implement this
     if false {
         debug!("No end condition met, moving to next turn");
-        next_state.set(GameState::TakingTurn);
+        next_state.set(AppState::WaitForSelection);
     } else {
-
+        debug!("End condition met, moving to terminal state");
+        next_state.set(AppState::Winner);
+        let entity = just_took_turn_query.single();
+        commands.entity(entity).insert(
+            WinnerMarker([BoardPosition::try_from((0, 0)).expect("This never should've even made it to the debug build"); 4])
+        );
     }
+}
+
+/// Invoked when the end conditions are not satisfied.
+/// In other words, when the state is transitioning from
+/// checking the end conditions to the next turn.
+///
+/// Increment the turn number, and move the TakingTurnMarker
+/// struct from one player to the other.
+pub fn advance_to_next_turn_system(
+    mut commands: Commands,
+    turn_number: ResMut<TurnNumber>,
+    taking_turn_query: Query<(Entity, Option<&TakingTurnMarker>), With<PlayerMarker>>
+) {
+    // TODO - Surely there is a better way to do this. 
+    let mut len = 0;
+
+    for player in &taking_turn_query {
+        if let Some(_taking_turn_marker) = player.1 {
+            // Remove the taking turn marker component from this entity.
+            commands.entity(player.0).remove::<TakingTurnMarker>();
+            debug!("Removed TakingTurnMarker from entity {:?}", player.0);
+        } else {
+            // Add the taking turn marker component to this entity.
+            commands.entity(player.0).insert(TakingTurnMarker);
+            debug!("Added TakingTurnMarker to entity {:?}", player.0);
+        }
+        len += 1;
+    }
+    debug_assert!(
+        len == 2,
+        "Tried to advance to the next turn, but there are more than two players!"
+    );
+
+    let turn_number = turn_number.into_inner();
+    turn_number.0 += 1;
+    debug!("Ready to proceed to turn number {:?}", turn_number);
 }
 
 #[cfg(test)]
@@ -113,21 +171,17 @@ mod test {
         let mut app = App::new();
 
         // Pre-requisites
-        app.insert_state(AppState::RunningGame(GameState::EvaluatingEndConditions));
-        app.add_plugins(TurnBasedGameplayPlugin);
-
+        app.insert_state(AppState::EvaluateBoard);
         let state: State<AppState> = State::from_world(&mut app.world);
-        todo!("Figure out correct syntax for testing this");
-        let next_state: NextState<AppState> = NextState::from_world(&mut app.world);
-        assert_eq!(*state.get(), AppState::RunningGame(GameState::EvaluatingEndConditions));
+        assert_eq!(*state.get(), AppState::EvaluateBoard);
 
         // Tick to trigger systems that run on Update schedule
         app.update();
 
         // State should be set to TakingTurn now
-        let s: State<AppState> = State::from_world(&mut app.world);
+        let state: State<AppState> = State::from_world(&mut app.world);
         let next_state: NextState<AppState> = NextState::from_world(&mut app.world);
-        assert_eq!(*state.get(), AppState::RunningGame(GameState::TakingTurn));
+        assert_eq!(*state.get(), AppState::WaitForSelection);
 
         // TODO - Once actually implemented, add more to this test
     }
