@@ -4,14 +4,14 @@ use crate::{board::{BoardPosition, Team, Board}, AppState, TEXT_COLOR};
 
 // Tag component used to tag entities added on the game screen
 #[derive(Component)]
-struct OnGameScreen;
+pub struct OnGameScreenMarker;
 
-#[derive(Resource, Deref, DerefMut)]
-struct GameTimer(Timer);
-
-fn game_setup(
+pub fn game_setup(
     mut commands: Commands,
+    mut next_game_state: ResMut<NextState<AppState>>
 ) {
+    debug!("Running new game setup...");
+
     commands
         .spawn((
             NodeBundle {
@@ -25,7 +25,7 @@ fn game_setup(
                 },
                 ..default()
             },
-            OnGameScreen,
+            OnGameScreenMarker,
         ))
         .with_children(|parent| {
             // First create a `NodeBundle` for centering what we want to display
@@ -61,19 +61,9 @@ fn game_setup(
                     );
                 });
         });
-    // Spawn a 5 seconds timer to trigger going back to the menu
-    commands.insert_resource(GameTimer(Timer::from_seconds(5.0, TimerMode::Once)));
-}
 
-// Tick the timer, and change state when finished
-fn game(
-    time: Res<Time>,
-    mut game_state: ResMut<NextState<AppState>>,
-    mut timer: ResMut<GameTimer>,
-) {
-    if timer.tick(time.delta()).finished() {
-        game_state.set(AppState::Menu);
-    }
+    debug!("Done setting up new game!");
+    next_game_state.set(AppState::WaitForSelection);
 }
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -105,6 +95,8 @@ pub fn evaluate_end_condition_system(
     mut next_state: ResMut<NextState<AppState>>,
     just_took_turn_query: Query<Entity, (With<TakingTurnMarker>, With<PlayerMarker>)>,
 ) {
+    debug!("Evaluating board state to check end conditions...");
+
     if turn_number.0 < 4 {
         debug!("Turn number is less than 4, skipping end condition check");
         next_state.set(AppState::WaitForSelection);

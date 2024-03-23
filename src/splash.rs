@@ -2,27 +2,29 @@ use bevy::prelude::*;
 
 use super::{despawn_screen, AppState};
 
-// This plugin will display a splash screen with Bevy logo for 1 second before switching to the menu
-pub fn splash_plugin(app: &mut App) {
-    // As this plugin is managing the splash screen, it will focus on the state `GameState::Splash`
-    app
-        // When entering the state, spawn everything needed for this screen
-        .add_systems(OnEnter(AppState::Splash), splash_setup)
-        // While in this state, run the `countdown` system
-        .add_systems(Update, countdown.run_if(in_state(AppState::Splash)))
-        // When exiting the state, despawn everything that was spawned for this screen
-        .add_systems(OnExit(AppState::Splash), despawn_screen::<OnSplashScreen>);
-}
+pub struct SplashPlugin;
 
+// This plugin will display a splash screen with Bevy logo for 1 second before switching to the menu
+impl Plugin for SplashPlugin {
+    fn build(&self, app: &mut App) {
+        app
+            // When entering the state, spawn everything needed for this screen
+            .add_systems(OnEnter(AppState::Splash), splash_setup)
+            // While in this state, run the `countdown` system
+            .add_systems(Update, countdown.run_if(in_state(AppState::Splash)))
+            // When exiting the state, despawn everything that was spawned for this screen
+            .add_systems(OnExit(AppState::Splash), despawn_screen::<OnSplashScreen>);
+    }
+}
 // Tag component used to tag entities added on the splash screen
 #[derive(Component)]
-struct OnSplashScreen;
+pub struct OnSplashScreen;
 
 // Newtype to use a `Timer` for this screen as a resource
 #[derive(Resource, Deref, DerefMut)]
-struct SplashTimer(Timer);
+pub struct SplashTimer(Timer);
 
-fn splash_setup(
+pub fn splash_setup(
     mut commands: Commands,
     _asset_server: Res<AssetServer>
 ) {
@@ -64,12 +66,13 @@ fn splash_setup(
 }
 
 // Tick the timer, and change state when finished
-fn countdown(
+pub fn countdown(
     mut game_state: ResMut<NextState<AppState>>,
     time: Res<Time>,
     mut timer: ResMut<SplashTimer>,
 ) {
     if timer.tick(time.delta()).finished() {
+        debug!("Splash timer is done! Progressing to menu...");
         game_state.set(AppState::Menu);
     }
 }

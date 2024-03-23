@@ -24,7 +24,8 @@ pub enum MainMenuOption {
 
 #[derive(Component)]
 pub enum MenuButtonAction {
-
+    BeginNewGame,
+    Quit,
 }
 
 #[derive(Component)]
@@ -116,10 +117,8 @@ pub fn draw_main_menu(
             },
             background_color: BackgroundColor(Color::BLACK),
             ..default()
-        },
-        MainMenuUIElement)
-    )
-    .with_children(|main_menu_root| {
+        }, MainMenuUIElement))
+        .with_children(|main_menu_root| {
             main_menu_root.spawn(
                 NodeBundle {
                     style: Style {

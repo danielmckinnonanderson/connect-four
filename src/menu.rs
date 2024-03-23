@@ -2,32 +2,37 @@ use bevy::{app::AppExit, prelude::*};
 
 use super::{despawn_screen, AppState, TEXT_COLOR};
 
+pub struct MenuPlugin;
 // This plugin manages the menu, with 5 different screens:
 // - a main menu with "New Game", "Settings", "Quit"
 // - a settings menu with two submenus and a back button
 // - two settings screen with a setting that can be set and a back button
-pub fn menu_plugin(app: &mut App) {
-    app
-        // At start, the menu is not enabled. This will be changed in `menu_setup` when
-        // entering the `GameState::Menu` state.
-        // Current screen in the menu is handled by an independent state from `GameState`
-        .init_state::<MenuState>()
-        .add_systems(OnEnter(AppState::Menu), menu_setup)
-        // Systems to handle the main menu screen
-        .add_systems(OnEnter(MenuState::Main), main_menu_setup)
-        .add_systems(OnExit(MenuState::Main), despawn_screen::<OnMainMenuScreen>)
-        // Systems to handle the settings menu screen
-        .add_systems(OnEnter(MenuState::Settings), settings_menu_setup)
-        .add_systems(
-            OnExit(MenuState::Settings),
-            despawn_screen::<OnSettingsMenuScreen>,
-        )
-        // Common systems to all screens that handles buttons behavior
-        .add_systems(
-            Update,
-            (button_system).run_if(in_state(AppState::Menu)),
-        );
+impl Plugin for MenuPlugin {
+    fn build(&self, app: &mut App) {
+        app
+            // At start, the menu is not enabled. This will be changed in `menu_setup` when
+            // entering the `GameState::Menu` state.
+            // Current screen in the menu is handled by an independent state from `GameState`
+            .init_state::<MenuState>()
+            .add_systems(OnEnter(AppState::Menu), menu_setup)
+            // Systems to handle the main menu screen
+            .add_systems(OnEnter(MenuState::Main), main_menu_setup)
+            .add_systems(OnExit(MenuState::Main), despawn_screen::<OnMainMenuScreen>)
+            // Systems to handle the settings menu screen
+            .add_systems(OnEnter(MenuState::Settings), settings_menu_setup)
+            .add_systems(
+                OnExit(MenuState::Settings),
+                despawn_screen::<OnSettingsMenuScreen>,
+            )
+            // Common systems to all screens that handles buttons behavior
+            .add_systems(
+                Update,
+                (menu_action, button_system)
+                    .run_if(in_state(AppState::Menu)),
+            );
+    }
 }
+
 
 // State used for the current menu screen
 #[derive(Clone, Copy, Default, Eq, PartialEq, Debug, Hash, States)]
@@ -64,7 +69,7 @@ const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
 struct SelectedOption;
 
 // All actions that can be triggered from a button click
-#[derive(Component)]
+#[derive(Component, Debug)]
 enum MenuButtonAction {
     Play,
     Settings,
@@ -92,6 +97,34 @@ fn button_system(
     }
 }
 
+fn menu_action(
+    interaction_query: Query<
+        (&Interaction, &MenuButtonAction),
+        (Changed<Interaction>, With<Button>),
+    >,
+    mut app_exit_events: EventWriter<AppExit>,
+    mut next_menu_state: ResMut<NextState<MenuState>>,
+    mut next_game_state: ResMut<NextState<AppState>>,
+) {
+    for (interaction, menu_button_action) in &interaction_query {
+        if *interaction == Interaction::Pressed {
+            match menu_button_action {
+                MenuButtonAction::Play => {
+                    debug!("Pressed Play!");
+                    next_menu_state.set(MenuState::Disabled);
+                    next_game_state.set(AppState::BeginNewGame);
+                }
+                MenuButtonAction::Quit => {
+                    app_exit_events.send(AppExit);
+                }
+                unmatched => {
+                    debug!("Pressed {:?}", unmatched);
+                }
+            }
+        }
+    }
+}
+
 // This system updates the settings when a new value for a setting is selected, and marks
 // the button as the one currently selected
 fn setting_button<T: Resource + Component + PartialEq + Copy>(
@@ -115,7 +148,10 @@ fn menu_setup(mut menu_state: ResMut<NextState<MenuState>>) {
     menu_state.set(MenuState::Main);
 }
 
-fn main_menu_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn main_menu_setup(
+    mut commands: Commands,
+    _asset_server: Res<AssetServer>
+) {
     // Common style for all buttons on the screen
     let button_style = Style {
         width: Val::Px(250.0),

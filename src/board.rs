@@ -1,5 +1,7 @@
 use bevy::{prelude::*, utils::hashbrown::HashMap};
 
+use crate::game::OnGameScreenMarker;
+
 pub const BOARD_HEIGHT: u8 = 7;
 pub const BOARD_WIDTH: u8 = 9;
 
@@ -118,6 +120,39 @@ impl Board {
         }
 
         Board(board)
+    }
+}
+
+pub fn draw_board_system(
+    mut commands: Commands,
+) {
+    let root_entity = commands.spawn(NodeBundle {
+        style: Style {
+            width: Val::Percent(100.0),
+            ..default()
+        },
+        background_color: BackgroundColor(Color::BLACK),
+        ..default()
+    }).id();
+
+
+    for _ in 0..BOARD_WIDTH {
+        let column_entity = commands.spawn((NodeBundle {
+            style: Style {
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                width: Val::Percent(11.111), // 100.0 / 9 columns
+                height: Val::Percent(100.0),
+                border: UiRect::all(Val::Px(2.0)),
+                ..default()
+            },
+            background_color: BackgroundColor(Color::RED),
+            ..default()
+        },
+            OnGameScreenMarker
+        )).id();
+
+        commands.entity(root_entity).push_children(&[column_entity]);
     }
 }
 
