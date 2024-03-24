@@ -1,4 +1,4 @@
-use bevy::{prelude::*, utils::hashbrown::HashMap};
+use bevy::{prelude::*, utils::hashbrown::HashMap, input::{mouse::MouseButtonInput, ButtonState}};
 
 use crate::game::OnGameScreenMarker;
 
@@ -144,6 +144,7 @@ pub fn draw_board_system(
                 width: Val::Percent(11.111), // 100.0 / 9 columns
                 height: Val::Percent(100.0),
                 border: UiRect::all(Val::Px(2.0)),
+                padding: UiRect::all(Val::Px(4.0)),
                 ..default()
             },
             background_color: BackgroundColor(Color::RED),
@@ -153,6 +154,20 @@ pub fn draw_board_system(
         )).id();
 
         commands.entity(root_entity).push_children(&[column_entity]);
+    }
+}
+
+// TODO - Better name, appropriately scope what this is actually for
+pub fn handle_leftclick_input_system(
+    mut leftclick_events: EventReader<MouseButtonInput>,
+) {
+    for event in leftclick_events.read() {
+        match (event.button, event.state) {
+            (MouseButton::Left, ButtonState::Pressed) => {
+                debug!("User left-clicked!");
+            },
+            _ => {}
+        }
     }
 }
 

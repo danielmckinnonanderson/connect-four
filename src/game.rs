@@ -7,63 +7,12 @@ use crate::{board::{BoardPosition, Team, Board}, AppState, TEXT_COLOR};
 pub struct OnGameScreenMarker;
 
 pub fn game_setup(
-    mut commands: Commands,
+    mut _commands: Commands,
     mut next_game_state: ResMut<NextState<AppState>>
 ) {
     debug!("Running new game setup...");
-
-    commands
-        .spawn((
-            NodeBundle {
-                style: Style {
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    // center children
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    ..default()
-                },
-                ..default()
-            },
-            OnGameScreenMarker,
-        ))
-        .with_children(|parent| {
-            // First create a `NodeBundle` for centering what we want to display
-            parent
-                .spawn(NodeBundle {
-                    style: Style {
-                        // This will display its children in a column, from top to bottom
-                        flex_direction: FlexDirection::Column,
-                        // `align_items` will align children on the cross axis. Here the main axis is
-                        // vertical (column), so the cross axis is horizontal. This will center the
-                        // children
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    background_color: Color::BLACK.into(),
-                    ..default()
-                })
-                .with_children(|parent| {
-                    // Display two lines of text, the second one with the current settings
-                    parent.spawn(
-                        TextBundle::from_section(
-                            "Will be back to the menu shortly...",
-                            TextStyle {
-                                font_size: 80.0,
-                                color: TEXT_COLOR,
-                                ..default()
-                            },
-                        )
-                        .with_style(Style {
-                            margin: UiRect::all(Val::Px(50.0)),
-                            ..default()
-                        }),
-                    );
-                });
-        });
-
-    debug!("Done setting up new game!");
     next_game_state.set(AppState::WaitForSelection);
+    debug!("Done setting up new game!");
 }
 
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Hash)]
