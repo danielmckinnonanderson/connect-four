@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <assert.h>
 #include "raylib.h"
 #include "raymath.h"
 
@@ -53,9 +55,11 @@ typedef struct GameState {
 } GameState;
 
 
-void UpdateGame(GameState *game);
-void DrawGame(const GameState *game, const Vector2 *mouse_pos);
-int LowestOpenSpace(const GameState *game, const int col);
+void  TeardownGame(GameState *game);
+void  UpdateGame(GameState *game);
+void  DrawGame(const GameState *game, const Vector2 *mouse_pos);
+
+int   LowestOpenSpace(const GameState *game, const int col);
 State EvaluateBoard(const GameState *game);
 
 
@@ -100,6 +104,7 @@ int main(void)
     }
 
     // Cleanup
+    TeardownGame(&game);
     CloseWindow();
     return 0;
 }
@@ -338,6 +343,11 @@ int LowestOpenSpace(const GameState *game, const int col_idx)
 
 State EvaluateBoard(const GameState *game)
 {
+    assert(game->state == TAKING_TURN_A || game->state == TAKING_TURN_B);
+    assert(game->board_width == BOARD_WIDTH
+           && game->board_height == BOARD_HEIGHT
+           && game->board_height == game->board_width);
+
     // Get most recent move
     GameHistory *last_move = game->history;
 
@@ -347,31 +357,30 @@ State EvaluateBoard(const GameState *game)
     // If no winner is found, return TAKING_TURN_A or TAKING_TURN_B
     // If the board is full, return DRAW
 
-    // Check for horizontal win
+    assert(game->board_width == game->board_height);
     int horizontal_count = 0;
+    int vertical_count = 0;
     for (int i = 0; i < game->board_width; i++) {
+        // Horizontal
         if (game->board[last_move->row][i] == last_move->team_placed) {
             horizontal_count += 1;
+
+            if (horizontal_count >= 4) {
+                return last_move->team_placed == PLAYER_A_VALUE ? WINNER_A : WINNER_B;
+            }
         } else {
             horizontal_count = 0;
         }
 
-        if (horizontal_count >= 4) {
-            return last_move->team_placed == PLAYER_A_VALUE ? WINNER_A : WINNER_B;
-        }
-    }
-
-    // Check for vertical win
-    int vertical_count = 0;
-    for (int i = 0; i < game->board_height; i++) {
+        // Vertical
         if (game->board[i][last_move->col] == last_move->team_placed) {
             vertical_count += 1;
+
+            if (vertical_count >= 4) {
+                return last_move->team_placed == PLAYER_A_VALUE ? WINNER_A : WINNER_B;
+            }
         } else {
             vertical_count = 0;
-        }
-
-        if (vertical_count >= 4) {
-            return last_move->team_placed == PLAYER_A_VALUE ? WINNER_A : WINNER_B;
         }
     }
 
@@ -392,6 +401,17 @@ State EvaluateBoard(const GameState *game)
         return DRAW;
     } else {
         return last_move->team_placed == PLAYER_A_VALUE ? TAKING_TURN_B : TAKING_TURN_A;
+    }
+}
+
+void TeardownGame(GameState *game)
+{
+    // Free history
+    GameHistory *current = game->history;
+    while (current != NULL) {
+        GameHistory *next = current->previous;
+        free(current);
+        current = next;
     }
 }
 
